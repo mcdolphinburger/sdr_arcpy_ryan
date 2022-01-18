@@ -55,10 +55,6 @@ targetlyrs = arcpy.GetParameterAsText(0)		       # Input Feature Layer
 
 # Initialize main variables.
 # --------------------------------------------------------------------------------------------------------------
-
-
-#arcpy.SelectLayerByAttribute_management(lyr, "CLEAR_SELECTION", "")
-
 lyrs = targetlyrs.split(";")
 
 # Introduction message (if necessary)
@@ -72,51 +68,24 @@ msg("===========================================================================
 #                                                                                        D O   T H E   W O  R K
 # ==============================================================================================================
 
+# Get the first N characters in a string: val[:N], where val is a string value
+
 for lyr in lyrs:
-	# try:
-	msg("\nProcessing layer: " + lyr + "\n")
-	for fd in arcpy.ListFields(lyr):
-		nam = fd.name
-		alias = fd.aliasName
-		if fd.editable:
-			if fd.type == "String":
-				msg(" Processing field " + nam.upper() + " | " + " (" + fd.type + ")")
+	try:
+		for fd in arcpy.ListFields(lyr):
+			if fd.name[:4] == "STOP":
+				msg("Processing field " + fd.name + " in layer " + lyr)
 				cur = arcpy.da.UpdateCursor(lyr, fd.name)
 				for row in cur:
-					if row[0] == None:
-						row[0] = ""
-						cur.updateRow(row)
-					else:
-						v = row[0]
-						v = v.strip()
-						v = v.upper()
-						row[0] = v
-						cur.updateRow(row)
-				cur, row = None, None
-			elif fd.type == "Double" or fd.type == "Single" or fd.type == "Integer" or fd.type == "SmallInteger":
-				msg(" Processing field " + nam.upper() + " | " + " (" + fd.type + ")")
-				cur = arcpy.da.UpdateCursor(lyr, fd.name)
-				for row in cur:
-					if row[0] == None:
-						row[0] = 0
-						cur.updateRow(row)
-				cur, row = None, None
-			elif fd.type == "Date":
-				msg(" Processing field " + nam.upper() + " | " + " (" + fd.type + ")")
-				cur = arcpy.UpdateCursor(lyr)
-				for row in cur:
-					if row.getValue(fd.name) == None:
-						row.setValue(fd.name, datetime.datetime(1899, 12, 31))
-						cur.updateRow(row)
-				cur, row = None, None
-		else:
-			msg(" Field " + str(fd.name).upper() + " is not editable")
-	# except Exception as e:
-		# row, cur = None, None
-		# msg("\n---------------------------------------------------------------------------")
-		# msg("There was an error processing the data.")
-		# msg("Error message:\n\n" + str(e))
-		# msg("\n---------------------------------------------------------------------------")
+					row[0] = "****"
+					cur.updateRow(row)
+			
+	except Exception as e:
+		row, cur = None, None
+		msg("\n---------------------------------------------------------------------------")
+		msg("There was an error processing the data.")
+		msg("Error message:\n\n" + str(e))
+		msg("\n---------------------------------------------------------------------------")
 		
 
 

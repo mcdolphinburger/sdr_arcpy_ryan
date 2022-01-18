@@ -1,10 +1,10 @@
 """
 Author: Ryan Saul Cunningham
 Email: rcunningham@sdrmaps
-Tool: rng_calc_lohi_pconst_eval_offset_reversed_rsc_1.py
+Tool: master_centerlines_ranges_evaluator_1.py
 Created: 2012-09-08
-Modified: 2022-01-10
-About: Master road centerlines properties evaluation script: calculates low and high range values, parity constant, ranges evalution check, offset ranges check, reversed ranges check.
+Modified: 2022-01-16
+About: Master road centerlines properties evaluation script: calculates low and high range values, overall (----) parity constant, ranges evalution constant, reversed ranges constant, offset ranges constant, left and right parity constants.
 """
 
 
@@ -29,16 +29,24 @@ def FieldExists(fields, fname):
 			return True
 	return False
     
-def FieldExistsAlpha(lyr, fname):
-	for fld in arcpy.ListFields(lyr):
+def FieldExistsAlpha(lyrR, fname):
+	for fld in arcpy.ListFields(lyrR):
 		if fld.name == fname:
 			return True
 	return False
+    
+def FieldExistsBeta(fds, fname):
+	for fld in fds:
+		if fld.name.upper() == fname.upper():
+			#msg("True!")
+			return True
+	#msg("False!")
+	return False
 
-def CreateTextField(lyr, fname, len):
+def CreateTextField(lyrR, fname, len):
 	arcpy.AddField_management(lyr, fname, "TEXT", "", "", len, fname, "NULLABLE", "NON_REQUIRED", "")
 	
-def CreateLongField(lyr, fname):
+def CreateLongField(lyrR, fname):
 	arcpy.AddField_management(lyr, fname, "LONG", "", "", "", fname, "NULLABLE", "NON_REQUIRED", "")
 	
 def CalculatePCONST(x1, x2, y1, y2):
@@ -68,62 +76,80 @@ def CalculatePCONST(x1, x2, y1, y2):
 		cRT = "O"
 		
 	return cLF + cLT + cRF + cRT
+    
+def GetLRParity(v):
+	if v == 0:
+		return "Z"
+	elif v % 2 == 0:   #if input_num % 2 == 0
+		return "E"
+	else:
+		return "O"
 
-
-#                                                                                               B E G I N
-# -------------------------------------------------------------------------------------------------------
-
-arcpy.AddMessage("\n\nUpdating Range Info")
-arcpy.AddMessage("=================================" + "\n\n")
+def CalculateRoadName(rn1, rn2, rn3, rn4, rn5):
+    rn = (rn1 + " " + rn2).strip()
+    rn = (rn + " " + rn3).strip()
+    rn = (rn + " " + rn4).strip()
+    rn = (rn + " " + rn5).strip()
+    return rn
 
 
 #                                                                                        Script arguments
 # -------------------------------------------------------------------------------------------------------
-lyr = arcpy.GetParameterAsText(0)
-LF = arcpy.GetParameterAsText(1)
-LT = arcpy.GetParameterAsText(2)
-RF = arcpy.GetParameterAsText(3)
-RT = arcpy.GetParameterAsText(4)
-fldRES = arcpy.GetParameterAsText(5)
-fldREZ = arcpy.GetParameterAsText(6)
+lyrR = arcpy.GetParameterAsText(0)
+lyrA = arcpy.GetParameterAsText(1)
+LF = arcpy.GetParameterAsText(2)
+LT = arcpy.GetParameterAsText(3)
+RF = arcpy.GetParameterAsText(4)
+RT = arcpy.GetParameterAsText(5)
+fldRES = arcpy.GetParameterAsText(6)
+fldREZ = arcpy.GetParameterAsText(7)
+pL = arcpy.GetParameterAsText(8)
+pR = arcpy.GetParameterAsText(9)
+doPRT = arcpy.GetParameter(10)
 
 
 #                                                                               Initialize some variables
 # -------------------------------------------------------------------------------------------------------
-fields = arcpy.ListFields(lyr)
-cursorfields = []
+fields = arcpy.ListFields(lyrR)
 cursorfields = ["PCONST", "RNG_EVAL1", LF, LT, RF, RT, "RNG_LOW", "RNG_HIGH"]
+desc = arcpy.Describe(lyrR)
+fc = desc.FeatureClass
+fds = arcpy.ListFields(lyrR)
 
-# Parsing strings
-# --------------------------------------------------------------------------------------------------------------------------------
-# Get the first N characters in a string: val[:N], where val is a string value
-# Strip off the first N characters in a string: val[N:], where val is a string value
-# Get the last N characters in a string: val[-N:], where val is a string value
-# Strip off the last N characters in a string: val[:-N], where val is a string value
+
+# ==============================================================================================================
+# BLOCK 1: calculate PCONST, RNG_EVAL1, RNG_LOW and RNG_HIGH
+# ==============================================================================================================
+
+
+#                                                                                               B E G I N
+# -------------------------------------------------------------------------------------------------------
+arcpy.AddMessage("\n\nUpdating Range Info")
+arcpy.AddMessage("=================================" + "\n\n")
 
 
 #                                        Check centerline layer for required fields, add them if necessary
 # --------------------------------------------------------------------------------------------------------
 if not FieldExists(fields, "PCONST"):
-	CreateTextField(FL1, "PCONST", "4")
+	CreateTextField(lyrR, "PCONST", "4")
 	msg("             Range Parity Constant [PCONST] exists?  FALSE (field created)")
 else:
 	msg("             Range Parity Constant [PCONST] exists?  TRUE")
     
 if not FieldExists(fields, "RNG_EVAL1"):
-	CreateTextField(FL1, "RNG_EVAL1", "4")
+	CreateTextField(lyrR, "RNG_EVAL1", "4")
 	msg("Range Evaluation Constant field [RNG_EVAL1] exists?  FALSE (field created)")
 else:
 	msg("Range Evaluation Constant field [RNG_EVAL1] exists?  TRUE")
     
 if not FieldExists(fields, "RNG_LOW"):
-	CreateLongField(FL1, "RNG_LOW")
+	CreateLongField(lyrR, "RNG_LOW")
 	msg("                        Low Range [RNG_LOW] exists?  FALSE (field created)")
 else:
 	msg("                        Low Range [RNG_LOW] exists?  TRUE")
 	
 if not FieldExists(fields, "RNG_HIGH"):
-	CreateLongField(FL1, "RNG_HIGH")
+	CreateLongField(lyrR, "RNG_HIGH")
 	msg("                      High Range [RNG_HIGH] exists?  FALSE (field created)")
 else:
 	msg("                      High Range [RNG_HIGH] exists?  TRUE")
@@ -133,7 +159,7 @@ else:
 # --------------------------------------------------------------------------------------------------------
 msg("\nUpdating Range Parity Constants and Range Evaluation Constants...")
 cur, row = None, None
-cur = arcpy.da.UpdateCursor(lyr, cursorfields)
+cur = arcpy.da.UpdateCursor(lyrR, cursorfields)
 for row in cur:
     vLF = float(row[2])
     vLT = float(row[3])
@@ -141,7 +167,7 @@ for row in cur:
     vRT = float(row[5])
 
     v = CalculatePCONST(vLF, vLT, vRF, vRT)
-    msg(v)
+    #msg(v)
     row[0] = v
 
     dL = vLT - vLF							# delta Left
@@ -208,13 +234,15 @@ for row in cur:
     row[1] = res1 + res2 + res3 + res4
         
     cur.updateRow(row)
+    
+#del row, cur
 	
 
 #                                                                                  Writing LOW/HIGH values
 # --------------------------------------------------------------------------------------------------------
-arcpy.AddMessage("Updating/Calculating LOW and HIGH fields...")
+arcpy.AddMessage("Updating/Calculating LOW and HIGH fields...\n")
 cur, row = None, None
-cur = arcpy.da.UpdateCursor(lyr, cursorfields)	
+cur = arcpy.da.UpdateCursor(lyrR, cursorfields)	
 for row in cur:
     pc = row[0]
     pcl = pc[:2]
@@ -239,44 +267,28 @@ for row in cur:
     row[7] = hi
     cur.updateRow(row)
 
+#del row, cur
 	
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
 
-	
+
+
 # ==============================================================================================================
-#                                                                             I N I T I A L I Z E   S C R I P T
+# BLOCK 2: calculate REV_RNG (or desired reversed ranges input) constant
 # ==============================================================================================================
-	
 
 
-# Initialize main variables.
-# --------------------------------------------------------------------------------------------------------------
-# LF = "LEFT_FROM"
-# LT = "LEFT_TO"
-# RF = "RIGHT_FROM"
-# RT = "RIGHT_TO"
-
-
-
-# Introduction message (if necessary)
+# Introduction message
 # -------------------------------------------------------------------------------------------------------------	
-#msg("\n\nEvaluating layer \"" + lyr + " for reversed ranges\n")
-#msg("\n\nLooking for reversed ranges\n\n")
-msg("\n\nUpdating reversed ranges constant. . .\n\n")
+msg("\n\nUpdating reversed ranges constant. . .\n")
 
-
-
-# ==============================================================================================================
-#                                                                                        D O   T H E   W O  R K
-# ==============================================================================================================
-
-if FieldExistsAlpha(lyr, fldRES):
+if FieldExistsAlpha(lyrR, fldRES):
 	msg("Field " + fldRES + " exists?  TRUE\n")
 else:
-	arcpy.AddField_management(lyr, fldRES, "TEXT", "", "", "16", fldRES, "NULLABLE", "NON_REQUIRED", "")
+	arcpy.AddField_management(lyrR, fldRES, "TEXT", "", "", "16", fldRES, "NULLABLE", "NON_REQUIRED", "")
 	msg("Field " + fldRES + " exists?  FALSE. Field was created.\n")
 
-with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldRES]) as cur:
+with arcpy.da.UpdateCursor(lyrR, [LF,LT,RF,RT,fldRES]) as cur:
 	for row in cur:
 		vLF = row[0]
 		vLT = row[1]
@@ -317,27 +329,26 @@ with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldRES]) as cur:
 
 del row, cur
 
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
 
-# Introduction message (if necessary)
+
+
+# ==============================================================================================================
+# BLOCK 3: calculate OFFSET_RNG (or desired offset ranges input) constant
+# ==============================================================================================================
+
+
+# Introduction message
 # -------------------------------------------------------------------------------------------------------------	
-# msg("\n\nEvaluating layer \"" + lyr + " for offset ranges\n")
-# msg("\n\nLooking for offset ranges\n\n")
-msg("\n\nUpdating offset ranges constant. . .\n\n")
+msg("\n\nUpdating offset ranges constant. . .\n")
 
-
-
-# ==============================================================================================================
-#                                                                                        D O   T H E   W O  R K
-# ==============================================================================================================
-
-if FieldExistsAlpha(lyr, fldREZ):
+if FieldExistsAlpha(lyrR, fldREZ):
 	msg("Field " + fldREZ + " exists?  TRUE\n")
 else:
-	arcpy.AddField_management(lyr, fldREZ, "TEXT", "", "", "16", fldREZ, "NULLABLE", "NON_REQUIRED", "")
+	arcpy.AddField_management(lyrR, fldREZ, "TEXT", "", "", "16", fldREZ, "NULLABLE", "NON_REQUIRED", "")
 	msg("Field " + fldREZ + " exists?  FALSE. Field was created.\n")
 
-with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldREZ]) as cur:
+with arcpy.da.UpdateCursor(lyrR, [LF,LT,RF,RT,fldREZ]) as cur:
 	for row in cur:
 		vLF = row[0]
 		vLT = row[1]
@@ -360,6 +371,127 @@ with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldREZ]) as cur:
 
 del row, cur
 
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
+
+
+
+# ==============================================================================================================
+# BLOCK 4: calculate PARITY_L and PARITY_R (or desired left and right parity input) constants
+# ==============================================================================================================
+
+
+# Introduction message
+# -------------------------------------------------------------------------------------------------------------	
+msg("\n\nUpdating left and right parity constants. . .\n")
+
+
+#                                                                  Create and write Range Parity Constants
+# --------------------------------------------------------------------------------------------------------
+cursorfields = []
+cursorfields.append(LF)
+cursorfields.append(LT)
+cursorfields.append(RF)
+cursorfields.append(RT)
+cursorfields.append(pL)
+cursorfields.append(pR)
+
+with arcpy.da.UpdateCursor(lyrR, cursorfields) as cur:
+	for row in cur:
+		pLF = GetLRParity(row[0])
+		pLT = GetLRParity(row[1])
+		pRF = GetLRParity(row[2])
+		pRT = GetLRParity(row[3])
+		
+		if pLF == "Z" and pLT == "Z":
+			row[4] = "Z"
+		elif (pLF == "Z" and pLT == "E") or (pLF == "E" and pLT == "Z"):
+			row[4] = "E"
+		elif (pLF == "Z" and pLT == "O") or (pLF == "O" and pLT == "Z"):
+			row[4] = "O"
+		elif (pLF == "E" and pLT == "O") or (pLF == "O" and pLT == "E"):
+			row[4] = "B"
+		elif pLF == "E" and pLT == "E":
+			row[4] = "E"
+		elif pLF == "O" and pLT == "O":
+			row[4] = "O"
+
+		if pRF == "Z" and pRT == "Z":
+			row[5] = "Z"
+		elif (pRF == "Z" and pRT == "E") or (pRF == "E" and pRT == "Z"):
+			row[5] = "E"
+		elif (pRF == "Z" and pRT == "O") or (pRF == "O" and pRT == "Z"):
+			row[5] = "O"
+		elif (pRF == "E" and pRT == "O") or (pRF == "O" and pRT == "E"):
+			row[5] = "B"
+		elif pRF == "E" and pRT == "E":
+			row[5] = "E"
+		elif pRF == "O" and pRT == "O":
+			row[5] = "O"
+		
+		cur.updateRow(row)
+
+msg("\nGreat success! \(^ o ^)/\n")
+
+
+# ==============================================================================================================
+# BLOCK 5: calculate compiled road names, full address values
+# ==============================================================================================================
+
+
+# Initialize main variables.
+# --------------------------------------------------------------------------------------------------------------
+if doPRT:
+    cursorfieldsR = ["PRE_DIR", "STREET_NAME", "STREET_TYPE", "POST_DIR", "COMP_STR_NAME", "PRE_TYPE"]
+    cursorfieldsA = ["STRUCTURE_NUM", "PRE_DIR", "STREET_NAME", "STREET_TYPE", "POST_DIR", "COMP_STR_NAME", "FULL_ADDRESS", "PRE_TYPE"]
+else:
+    cursorfieldsR = ["PRE_DIR", "STREET_NAME", "STREET_TYPE", "POST_DIR", "COMP_STR_NAME"]
+    cursorfieldsA = ["STRUCTURE_NUM", "PRE_DIR", "STREET_NAME", "STREET_TYPE", "POST_DIR", "COMP_STR_NAME", "FULL_ADDRESS"]
+
+
+# Calculating road centerline road name values
+# --------------------------------------------------------------------------------------------------------------
+msg("\n\nCalculating compiled road names values in road centerlines layer. . .\n")
+row, cur = None, None
+cur = arcpy.da.UpdateCursor(lyrR, cursorfieldsR)	
+for row in cur:
+    r1 = row[0].strip()
+    if doPRT:
+        r2 = row[5].strip()
+    else:
+        r2 = ""
+    r3 = row[1].strip()
+    r4 = row[2].strip()
+    r5 = row[3].strip()
+    rn = CalculateRoadName(r1, r2, r3, r4, r5)
+    row[4] = rn
+    cur.updateRow(row)
+    
+msg("\nGreat success! \(^ o ^)/\n")
+
+
+# POSSIBILITY OF A SUB-BLOCK THAT WRITES ANY CHANGES MADE TO COMPILED ROAD NAMES ABOVE TO ANY CORRESPONDING STREET_NAME AND COMP_STR_NAME VALUES IN ADDRESSES LAYER?
+
+# Calculating address point road names and full addresses
+# --------------------------------------------------------------------------------------------------------------
+msg("\n\nCalculating road names and full addresses values in addresses layer. . .\n")
+row, cur = None, None
+cur = arcpy.da.UpdateCursor(lyrA, cursorfieldsA)	
+for row in cur:
+    a = row[0]
+    r1 = row[1].strip()
+    if doPRT:
+        r2 = row[7].strip()
+    else:
+        r2 = ""
+    r3 = row[2].strip()
+    r4 = row[3].strip()
+    r5 = row[4].strip()
+    rn = CalculateRoadName(r1, r2, r3, r4, r5)
+    fa = (str(a) + " " + rn).strip()
+    row[5] = rn
+    row[6] = fa
+    cur.updateRow(row)
+    
+msg("\nGreat success! \(^ o ^)/\n")
 
 msg("\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n ")

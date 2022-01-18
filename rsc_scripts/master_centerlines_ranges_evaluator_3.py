@@ -1,10 +1,10 @@
 """
 Author: Ryan Saul Cunningham
 Email: rcunningham@sdrmaps
-Tool: rng_calc_lohi_pconst_eval_offset_reversed_rsc_1.py
+Tool: master_centerlines_ranges_evaluator_1.py
 Created: 2012-09-08
-Modified: 2022-01-10
-About: Master road centerlines properties evaluation script: calculates low and high range values, parity constant, ranges evalution check, offset ranges check, reversed ranges check.
+Modified: 2022-01-16
+About: Master road centerlines properties evaluation script: calculates low and high range values, overall (----) parity constant, ranges evalution constant, reversed ranges constant, offset ranges constant, left and right parity constants.
 """
 
 
@@ -33,6 +33,14 @@ def FieldExistsAlpha(lyr, fname):
 	for fld in arcpy.ListFields(lyr):
 		if fld.name == fname:
 			return True
+	return False
+    
+def FieldExistsBeta(fds, fname):
+	for fld in fds:
+		if fld.name.upper() == fname.upper():
+			#msg("True!")
+			return True
+	#msg("False!")
 	return False
 
 def CreateTextField(lyr, fname, len):
@@ -68,13 +76,14 @@ def CalculatePCONST(x1, x2, y1, y2):
 		cRT = "O"
 		
 	return cLF + cLT + cRF + cRT
-
-
-#                                                                                               B E G I N
-# -------------------------------------------------------------------------------------------------------
-
-arcpy.AddMessage("\n\nUpdating Range Info")
-arcpy.AddMessage("=================================" + "\n\n")
+    
+def GetLRParity(v):
+	if v == 0:
+		return "Z"
+	elif v % 2 == 0:   #if input_num % 2 == 0
+		return "E"
+	else:
+		return "O"
 
 
 #                                                                                        Script arguments
@@ -86,44 +95,52 @@ RF = arcpy.GetParameterAsText(3)
 RT = arcpy.GetParameterAsText(4)
 fldRES = arcpy.GetParameterAsText(5)
 fldREZ = arcpy.GetParameterAsText(6)
+pL = arcpy.GetParameterAsText(7)
+pR = arcpy.GetParameterAsText(8)
 
 
 #                                                                               Initialize some variables
 # -------------------------------------------------------------------------------------------------------
 fields = arcpy.ListFields(lyr)
-cursorfields = []
 cursorfields = ["PCONST", "RNG_EVAL1", LF, LT, RF, RT, "RNG_LOW", "RNG_HIGH"]
+desc = arcpy.Describe(lyr)
+fc = desc.FeatureClass
+fds = arcpy.ListFields(lyr)
 
-# Parsing strings
-# --------------------------------------------------------------------------------------------------------------------------------
-# Get the first N characters in a string: val[:N], where val is a string value
-# Strip off the first N characters in a string: val[N:], where val is a string value
-# Get the last N characters in a string: val[-N:], where val is a string value
-# Strip off the last N characters in a string: val[:-N], where val is a string value
+
+# ==============================================================================================================
+# BLOCK 1: calculate PCONST, RNG_EVAL1, RNG_LOW and RNG_HIGH
+# ==============================================================================================================
+
+
+#                                                                                               B E G I N
+# -------------------------------------------------------------------------------------------------------
+arcpy.AddMessage("\n\nUpdating Range Info")
+arcpy.AddMessage("=================================" + "\n\n")
 
 
 #                                        Check centerline layer for required fields, add them if necessary
 # --------------------------------------------------------------------------------------------------------
 if not FieldExists(fields, "PCONST"):
-	CreateTextField(FL1, "PCONST", "4")
+	CreateTextField(lyr, "PCONST", "4")
 	msg("             Range Parity Constant [PCONST] exists?  FALSE (field created)")
 else:
 	msg("             Range Parity Constant [PCONST] exists?  TRUE")
     
 if not FieldExists(fields, "RNG_EVAL1"):
-	CreateTextField(FL1, "RNG_EVAL1", "4")
+	CreateTextField(lyr, "RNG_EVAL1", "4")
 	msg("Range Evaluation Constant field [RNG_EVAL1] exists?  FALSE (field created)")
 else:
 	msg("Range Evaluation Constant field [RNG_EVAL1] exists?  TRUE")
     
 if not FieldExists(fields, "RNG_LOW"):
-	CreateLongField(FL1, "RNG_LOW")
+	CreateLongField(lyr, "RNG_LOW")
 	msg("                        Low Range [RNG_LOW] exists?  FALSE (field created)")
 else:
 	msg("                        Low Range [RNG_LOW] exists?  TRUE")
 	
 if not FieldExists(fields, "RNG_HIGH"):
-	CreateLongField(FL1, "RNG_HIGH")
+	CreateLongField(lyr, "RNG_HIGH")
 	msg("                      High Range [RNG_HIGH] exists?  FALSE (field created)")
 else:
 	msg("                      High Range [RNG_HIGH] exists?  TRUE")
@@ -141,7 +158,7 @@ for row in cur:
     vRT = float(row[5])
 
     v = CalculatePCONST(vLF, vLT, vRF, vRT)
-    msg(v)
+    #msg(v)
     row[0] = v
 
     dL = vLT - vLF							# delta Left
@@ -208,11 +225,13 @@ for row in cur:
     row[1] = res1 + res2 + res3 + res4
         
     cur.updateRow(row)
+    
+#del row, cur
 	
 
 #                                                                                  Writing LOW/HIGH values
 # --------------------------------------------------------------------------------------------------------
-arcpy.AddMessage("Updating/Calculating LOW and HIGH fields...")
+arcpy.AddMessage("Updating/Calculating LOW and HIGH fields...\n")
 cur, row = None, None
 cur = arcpy.da.UpdateCursor(lyr, cursorfields)	
 for row in cur:
@@ -239,36 +258,20 @@ for row in cur:
     row[7] = hi
     cur.updateRow(row)
 
+#del row, cur
 	
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
 
-	
+
+
 # ==============================================================================================================
-#                                                                             I N I T I A L I Z E   S C R I P T
+# BLOCK 2: calculate REV_RNG (or desired reversed ranges input) constant
 # ==============================================================================================================
-	
 
 
-# Initialize main variables.
-# --------------------------------------------------------------------------------------------------------------
-# LF = "LEFT_FROM"
-# LT = "LEFT_TO"
-# RF = "RIGHT_FROM"
-# RT = "RIGHT_TO"
-
-
-
-# Introduction message (if necessary)
+# Introduction message
 # -------------------------------------------------------------------------------------------------------------	
-#msg("\n\nEvaluating layer \"" + lyr + " for reversed ranges\n")
-#msg("\n\nLooking for reversed ranges\n\n")
-msg("\n\nUpdating reversed ranges constant. . .\n\n")
-
-
-
-# ==============================================================================================================
-#                                                                                        D O   T H E   W O  R K
-# ==============================================================================================================
+msg("\n\nUpdating reversed ranges constant. . .\n")
 
 if FieldExistsAlpha(lyr, fldRES):
 	msg("Field " + fldRES + " exists?  TRUE\n")
@@ -317,19 +320,18 @@ with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldRES]) as cur:
 
 del row, cur
 
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
 
-# Introduction message (if necessary)
+
+
+# ==============================================================================================================
+# BLOCK 3: calculate OFFSET_RNG (or desired offset ranges input) constant
+# ==============================================================================================================
+
+
+# Introduction message
 # -------------------------------------------------------------------------------------------------------------	
-# msg("\n\nEvaluating layer \"" + lyr + " for offset ranges\n")
-# msg("\n\nLooking for offset ranges\n\n")
-msg("\n\nUpdating offset ranges constant. . .\n\n")
-
-
-
-# ==============================================================================================================
-#                                                                                        D O   T H E   W O  R K
-# ==============================================================================================================
+msg("\n\nUpdating offset ranges constant. . .\n")
 
 if FieldExistsAlpha(lyr, fldREZ):
 	msg("Field " + fldREZ + " exists?  TRUE\n")
@@ -360,6 +362,67 @@ with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldREZ]) as cur:
 
 del row, cur
 
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
+
+
+
+# ==============================================================================================================
+# BLOCK 4: calculate PARITY_L and PARITY_R (or desired left and right parity input) constants
+# ==============================================================================================================
+
+
+# Introduction message
+# -------------------------------------------------------------------------------------------------------------	
+msg("\n\nUpdating left and right parity constants. . .\n")
+
+
+#                                                                  Create and write Range Parity Constants
+# --------------------------------------------------------------------------------------------------------
+cursorfields = []
+cursorfields.append(LF)
+cursorfields.append(LT)
+cursorfields.append(RF)
+cursorfields.append(RT)
+cursorfields.append(pL)
+cursorfields.append(pR)
+
+with arcpy.da.UpdateCursor(lyr, cursorfields) as cur:
+	for row in cur:
+		pLF = GetLRParity(row[0])
+		pLT = GetLRParity(row[1])
+		pRF = GetLRParity(row[2])
+		pRT = GetLRParity(row[3])
+		
+		if pLF == "Z" and pLT == "Z":
+			row[4] = "Z"
+		elif (pLF == "Z" and pLT == "E") or (pLF == "E" and pLT == "Z"):
+			row[4] = "E"
+		elif (pLF == "Z" and pLT == "O") or (pLF == "O" and pLT == "Z"):
+			row[4] = "O"
+		elif (pLF == "E" and pLT == "O") or (pLF == "O" and pLT == "E"):
+			row[4] = "B"
+		elif pLF == "E" and pLT == "E":
+			row[4] = "E"
+		elif pLF == "O" and pLT == "O":
+			row[4] = "O"
+
+		if pRF == "Z" and pRT == "Z":
+			row[5] = "Z"
+		elif (pRF == "Z" and pRT == "E") or (pRF == "E" and pRT == "Z"):
+			row[5] = "E"
+		elif (pRF == "Z" and pRT == "O") or (pRF == "O" and pRT == "Z"):
+			row[5] = "O"
+		elif (pRF == "E" and pRT == "O") or (pRF == "O" and pRT == "E"):
+			row[5] = "B"
+		elif pRF == "E" and pRT == "E":
+			row[5] = "E"
+		elif pRF == "O" and pRT == "O":
+			row[5] = "O"
+		
+		cur.updateRow(row)
+
+
+
+msg("\nGreat success! \(^ o ^)/\n")
 
 msg("\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n ")

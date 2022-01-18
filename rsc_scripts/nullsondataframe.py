@@ -50,8 +50,9 @@ def GetWorkspaceType(ds):
 	
 # Script arguments
 # --------------------------------------------------------------------------------------------------------------
-mxd = arcpy.GetParameterAsText(0)
-#targetlyrs = arcpy.mapping.ListLayers(mxd)[0]		       # Input Feature Layer
+# targetlyrs = arcpy.GetParameterAsText(0)		       # Input Feature Layer
+mxd = arcpy.mapping.MapDocument("CURRENT")             # selects the project's mxd
+df = arcpy.mapping.ListDataFrames(mxd, '')[0]          # selects the project mxd's first dataframe
 
 
 # Initialize main variables.
@@ -60,7 +61,8 @@ mxd = arcpy.GetParameterAsText(0)
 
 #arcpy.SelectLayerByAttribute_management(lyr, "CLEAR_SELECTION", "")
 
-lyrs = arcpy.ListFeatureClasses()
+#lyrs = targetlyrs.split(";")
+lyrs = arcpy.mapping.ListLayers(mxd, '', df)
 
 # Introduction message (if necessary)
 # -------------------------------------------------------------------------------------------------------------	
@@ -74,44 +76,45 @@ msg("===========================================================================
 # ==============================================================================================================
 
 for lyr in lyrs:
+#for lyr in arcpy.mapping.ListLayers(mxd, '', df):
 	# try:
-	msg("\nProcessing layer: " + lyr + "\n")
-	for fd in arcpy.ListFields(lyr):
-		nam = fd.name
-		alias = fd.aliasName
-		if fd.editable:
-			if fd.type == "String":
-				msg(" Processing field " + nam.upper() + " | " + " (" + fd.type + ")")
-				cur = arcpy.da.UpdateCursor(lyr, fd.name)
-				for row in cur:
-					if row[0] == None:
-						row[0] = ""
-						cur.updateRow(row)
-					else:
-						v = row[0]
-						v = v.strip()
-						v = v.upper()
-						row[0] = v
-						cur.updateRow(row)
-				cur, row = None, None
-			elif fd.type == "Double" or fd.type == "Single" or fd.type == "Integer" or fd.type == "SmallInteger":
-				msg(" Processing field " + nam.upper() + " | " + " (" + fd.type + ")")
-				cur = arcpy.da.UpdateCursor(lyr, fd.name)
-				for row in cur:
-					if row[0] == None:
-						row[0] = 0
-						cur.updateRow(row)
-				cur, row = None, None
-			elif fd.type == "Date":
-				msg(" Processing field " + nam.upper() + " | " + " (" + fd.type + ")")
-				cur = arcpy.UpdateCursor(lyr)
-				for row in cur:
-					if row.getValue(fd.name) == None:
-						row.setValue(fd.name, datetime.datetime(1899, 12, 31))
-						cur.updateRow(row)
-				cur, row = None, None
-		else:
-			msg(" Field " + str(fd.name).upper() + " is not editable")
+	# msg("\nProcessing layer: " + lyr + "\n")
+    if lyr.isFeatureLayer:
+        msg("\nProcessing layer " + lyr.name + " in project dataframe. . . \n")
+        for fd in arcpy.ListFields(lyr):
+            if fd.editable:
+                if fd.type == "String":
+                    msg(" Processing field " + str(fd.name).upper() + " (" + fd.type + ")")
+                    cur = arcpy.da.UpdateCursor(lyr, fd.name)
+                    for row in cur:
+                        if row[0] == None:
+                            row[0] = ""
+                            cur.updateRow(row)
+                        else:
+                            v = row[0]
+                            v = v.strip()
+                            v = v.upper()
+                            row[0] = v
+                            cur.updateRow(row)
+                    cur, row = None, None
+                elif fd.type == "Double" or fd.type == "Single" or fd.type == "Integer" or fd.type == "SmallInteger":
+                    msg(" Processing field " + str(fd.name).upper() + " (" + fd.type + ")")
+                    cur = arcpy.da.UpdateCursor(lyr, fd.name)
+                    for row in cur:
+                        if row[0] == None:
+                            row[0] = 0
+                            cur.updateRow(row)
+                    cur, row = None, None
+                elif fd.type == "Date":
+                    msg(" Processing field " + str(fd.name).upper() + " (" + fd.type + ")")
+                    cur = arcpy.UpdateCursor(lyr)
+                    for row in cur:
+                        if row.getValue(fd.name) == None:
+                            row.setValue(fd.name, datetime.datetime(1899, 12, 31))
+                            cur.updateRow(row)
+                    cur, row = None, None
+            else:
+                msg(" Field " + str(fd.name).upper() + " is not editable")
 	# except Exception as e:
 		# row, cur = None, None
 		# msg("\n---------------------------------------------------------------------------")

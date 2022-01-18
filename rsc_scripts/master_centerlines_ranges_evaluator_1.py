@@ -1,10 +1,10 @@
 """
 Author: Ryan Saul Cunningham
 Email: rcunningham@sdrmaps
-Tool: rng_calc_lohi_pconst_eval_offset_reversed_rsc_1.py
+Tool: master_centerlines_ranges_evaluator_1.py
 Created: 2012-09-08
-Modified: 2022-01-10
-About: Master road centerlines properties evaluation script: calculates low and high range values, parity constant, ranges evalution check, offset ranges check, reversed ranges check.
+Modified: 2022-01-11
+About: Master road centerlines properties evaluation script: calculates low and high range values, parity constant, ranges evalution constant, reversed ranges constant, offset ranges constant. 
 """
 
 
@@ -141,7 +141,7 @@ for row in cur:
     vRT = float(row[5])
 
     v = CalculatePCONST(vLF, vLT, vRF, vRT)
-    msg(v)
+    #msg(v)
     row[0] = v
 
     dL = vLT - vLF							# delta Left
@@ -208,11 +208,13 @@ for row in cur:
     row[1] = res1 + res2 + res3 + res4
         
     cur.updateRow(row)
+    
+#del row, cur
 	
 
 #                                                                                  Writing LOW/HIGH values
 # --------------------------------------------------------------------------------------------------------
-arcpy.AddMessage("Updating/Calculating LOW and HIGH fields...")
+arcpy.AddMessage("Updating/Calculating LOW and HIGH fields...\n")
 cur, row = None, None
 cur = arcpy.da.UpdateCursor(lyr, cursorfields)	
 for row in cur:
@@ -239,8 +241,9 @@ for row in cur:
     row[7] = hi
     cur.updateRow(row)
 
+#del row, cur
 	
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
 
 	
 # ==============================================================================================================
@@ -262,7 +265,7 @@ msg("\n\nGreat success! \(^ o ^)/\n\n")
 # -------------------------------------------------------------------------------------------------------------	
 #msg("\n\nEvaluating layer \"" + lyr + " for reversed ranges\n")
 #msg("\n\nLooking for reversed ranges\n\n")
-msg("\n\nUpdating reversed ranges constant. . .\n\n")
+msg("\n\nUpdating reversed ranges constant. . .\n")
 
 
 
@@ -317,13 +320,13 @@ with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldRES]) as cur:
 
 del row, cur
 
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
 
 # Introduction message (if necessary)
 # -------------------------------------------------------------------------------------------------------------	
 # msg("\n\nEvaluating layer \"" + lyr + " for offset ranges\n")
 # msg("\n\nLooking for offset ranges\n\n")
-msg("\n\nUpdating offset ranges constant. . .\n\n")
+msg("\n\nUpdating offset ranges constant. . .\n")
 
 
 
@@ -360,6 +363,6 @@ with arcpy.da.UpdateCursor(lyr, [LF,LT,RF,RT,fldREZ]) as cur:
 
 del row, cur
 
-msg("\n\nGreat success! \(^ o ^)/\n\n")
+msg("\nGreat success! \(^ o ^)/\n")
 
 msg("\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n(>'-')> <('-'<) ^('-')^ v('-')v(>'-')> (^-^)\n\n ")
